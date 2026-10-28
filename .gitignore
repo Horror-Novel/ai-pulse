@@ -4,3 +4,9 @@ __pycache__/
 *.pyc
 *.db
 .pytest_cache/
+.venv/
+.venv-verify/
+.env
+!*.env.example
+playwright-report/
+test-results/

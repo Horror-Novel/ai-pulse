@@ -1,4 +1,6 @@
 import hashlib
+import hmac
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import jwt
@@ -11,11 +13,23 @@ from . import models
 
 
 def hash_password(password: str) -> str:
-    return hashlib.sha256(password.encode()).hexdigest()
+    salt = secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 600_000)
+    return f"pbkdf2_sha256$600000${salt}${digest.hex()}"
 
 
 def verify_password(password: str, hashed: str) -> bool:
-    return hash_password(password) == hashed
+    # Legacy hashes are upgraded on successful login, never created anew.
+    if len(hashed) == 64 and "$" not in hashed:
+        return hmac.compare_digest(hashlib.sha256(password.encode()).hexdigest(), hashed)
+    try:
+        scheme, iterations, salt, expected = hashed.split("$")
+        if scheme != "pbkdf2_sha256" or not 100_000 <= int(iterations) <= 1_000_000:
+            return False
+        actual = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), int(iterations)).hex()
+        return hmac.compare_digest(actual, expected)
+    except (ValueError, TypeError):
+        return False
 
 
 def make_token(user_id: int, org_id: int | None = None) -> str:
@@ -31,8 +45,13 @@ def _decode(authorization: str | None):
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(401, "Missing token")
     try:
-        return jwt.decode(authorization[7:], SECRET_KEY, algorithms=["HS256"])
-    except jwt.PyJWTError:
+        data = jwt.decode(authorization[7:], SECRET_KEY, algorithms=["HS256"], options={"require": ["sub", "exp"]})
+        if not isinstance(data["sub"], str) or not data["sub"].isdigit():
+            raise ValueError("Invalid subject")
+        if data.get("org") is not None and (type(data["org"]) is not int or data["org"] <= 0):
+            raise ValueError("Invalid organization")
+        return data
+    except (jwt.PyJWTError, ValueError, TypeError):
         raise HTTPException(401, "Invalid token")
 
 
