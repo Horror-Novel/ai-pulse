@@ -92,6 +92,10 @@ def run(reset=False):
     answer("kabir@bluepeak.test", bp, "common-open", "Uploaded our full customer refund list to an AI tool to find patterns.", 3, "Good idea, unsafe data handling.", ["customer_data_shared", "confidential_data_shared"])
     answer("kabir@bluepeak.test", bp, "common-freq", "Daily", 4)
 
+    # SessionLocal disables autoflush: persist legacy rows before replacing them,
+    # otherwise Priya's pending partial answers survive the bulk delete.
+    db.flush()
+
     # Exactly five complete Support assessments make the privacy boundary reproducible.
     for email in ("priya@northwind.test", "arjun@northwind.test", "kavitha@northwind.test", "anita@northwind.test", "nikhil@northwind.test"):
         m = db.query(models.Membership).filter_by(user_id=users[email].id, org_id=nw.id).one()

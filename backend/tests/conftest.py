@@ -22,7 +22,7 @@ def template_db(tmp_path_factory):
     path = tmp_path_factory.mktemp("template") / "template.db"
     engine = create_engine(f"sqlite:///{path}")
     original_engine, original_session = seed.engine, seed.SessionLocal
-    seed.engine, seed.SessionLocal = engine, sessionmaker(bind=engine)
+    seed.engine, seed.SessionLocal = engine, sessionmaker(bind=engine, autoflush=False)
     try:
         seed.run()
     finally:
