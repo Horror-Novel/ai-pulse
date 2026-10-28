@@ -2,6 +2,10 @@
 
 AI Pulse is a role-adaptive AI usage diagnostic with private employee reports and organization-scoped leadership insights. This assessment keeps the inherited FastAPI / SQLAlchemy / SQLite backend and React / Vite frontend. It is ready for a reproducible **local demonstration**, with the production limitations below.
 
+## Architecture
+
+React calls the FastAPI JSON API. A `User` has a separate `Membership` in each organization, carrying that organization's permission role, department, job role and seniority. Eligible questions come from the question bank; validated submissions atomically replace the membership's `Response` rows and current `Assessment` completion record. Personal reports and leadership aggregates are computed from validated complete assessments. Open answers use either deterministic mock fixtures or the configured AI provider.
+
 ## Running locally
 
 Use **Python 3.13** and **Node.js 22.12+** (Node 22 LTS recommended). Vite's [Node requirements](https://vite.dev/guide/) changed with the tooling security upgrade. No paid model or external database is needed.
@@ -118,7 +122,7 @@ Deletion is **per selected organization**. Employees with several organizations 
 
 ## Original feature: Employee Diagnostic Data Export
 
-Confirmed absent in the inherited code. `GET /diagnostic/me/export` and **My report & data â†’ Export my data (JSON)** provide organization-specific self-service transparency. The download includes the employee's own question text, answers, per-answer scores, AI explanations/flags, timestamps, scoring mode and personal report. It does not contain passwords, tokens, or other employees' data.
+Confirmed absent in the inherited code. `GET /diagnostic/me/export` and **My report & data > Export my data (JSON)** provide organization-specific self-service transparency. The download includes the employee's own question text, answers, per-answer scores, AI explanations/flags, timestamps, scoring mode and personal report. It does not contain passwords, tokens, or other employees' data.
 
 Empty/deleted data exports as an empty response list with an empty report. Incomplete inherited rows can be exported for inspection but are clearly not a completed report; their raw legacy scores are unverified. This single original feature complements the client's control/privacy requests.
 
@@ -156,9 +160,17 @@ Observed on Windows / Python 3.13 / Node 25.2.1:
 - Provider tests use mocks only: original malformed fixtures, missing fields, types/ranges/flags, timeouts, network/HTTP errors, credentials and prompt message separation.
 - The browser error test injects HTTP 502 to exercise the UI; backend tests independently verify actual scoring failure and rollback.
 - Dockerfile corrected, but image execution unverified: Docker Desktop's Linux daemon is unavailable here.
-- GitHub Actions is configured in `.github/workflows/ci.yml`; remote execution status is reported separately after push.
+- GitHub Actions is configured in `.github/workflows/ci.yml`. The [verified application CI run](https://github.com/Horror-Novel/ai-pulse/actions/runs/40735662385) passed on revision `caed34c`, independently confirming 95 backend tests, the production build and 3 browser workflows on Linux with Python 3.13 and Node 22.
 
-See [DEMO_GUIDE.md](DEMO_GUIDE.md) and [INTERVIEW_GUIDE.md](INTERVIEW_GUIDE.md).
+### Reproduce the client privacy behavior
+
+1. Start the local application with the seeded mock data above. As `asha@northwind.test`, select Northwind: Support appears with five completed employees; smaller departments are hidden.
+2. In a separate browser context, sign in as `priya@northwind.test` and open **My report & data**. Export JSON to inspect only that employee's organization-specific data.
+3. Confirm deletion of Priya's diagnostic. The report becomes empty, and a new export contains an empty response list.
+4. Refresh Asha's dashboard or wait for its next poll: Support disappears because only four completed employees remain. No hidden scores or risks enter summary fields.
+5. As Priya, complete and submit a new diagnostic. Support qualifies again at five; the retake replaces the current assessment rather than appending another completion.
+
+To verify per-organization roles, sign in as `ravi@consult.test`: Bluepeak grants administrator access while Northwind grants employee access. The backend regression tests also exercise direct unauthorized API requests.
 
 ## AI usage
 
@@ -175,3 +187,7 @@ OpenAI Codex inspected the inherited source, proposed and implemented fixes, wro
 - Live provider behavior, cost, rubric calibration, accuracy, fairness and prompt-injection resistance were not empirically validated. Schema checks establish shape/range, not truth. No automated employment decisions are appropriate.
 - Exports resolve question wording from the current bank; exact historical question wording is not versioned. Role/seniority/question-set changes can invalidate completion until a retake.
 - Desktop Chromium was exercised; Firefox, Safari, mobile and assistive-technology testing are unfinished. The five-minute video and assessment form submission remain the candidate's separate work.
+
+## Assessment submission
+
+The repository and this README describe the implementation, decisions and reproducible evidence. The candidate must separately submit a screen recording of **no more than five minutes** and complete the assessment form.
