@@ -3,8 +3,7 @@ from tests.conftest import login
 
 def test_login_lists_organizations(client):
     _, data = login(client, "ravi@consult.test")
-    names = {o["org_name"] for o in data["organizations"]}
-    assert names == {"Northwind Logistics", "Bluepeak Retail"}
+    assert {o["org_name"] for o in data["organizations"]} == {"Northwind Logistics", "Bluepeak Retail"}
 
 
 def test_employee_sees_questions(client):
@@ -12,6 +11,7 @@ def test_employee_sees_questions(client):
     r = client.get("/diagnostic/questions", headers=headers)
     assert r.status_code == 200
     assert any(q["id"] == "sup-drafts" for q in r.json())
+    assert "points" not in r.text
 
 
 def test_admin_dashboard(client):
@@ -19,11 +19,13 @@ def test_admin_dashboard(client):
     org_id = data["organizations"][0]["org_id"]
     r = client.get(f"/dashboard?org_id={org_id}", headers=headers)
     assert r.status_code == 200
-    assert len(r.json()["departments"]) == 4
+    assert [d["department"] for d in r.json()["departments"]] == ["Support"]
 
 
 def test_admin_cannot_see_other_org(client):
     headers, _ = login(client, "asha@northwind.test", "Northwind Logistics")
-    r = client.get("/dashboard?org_id=1", headers=headers)
-    assert r.status_code == 200
-    assert "departments" in r.json()
+    _, other = login(client, "meera@bluepeak.test", "Bluepeak Retail")
+    org_id = other["organizations"][0]["org_id"]
+    r = client.get(f"/dashboard?org_id={org_id}", headers=headers)
+    assert r.status_code == 403
+    assert "departments" not in r.json()

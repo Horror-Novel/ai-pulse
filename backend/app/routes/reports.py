@@ -5,6 +5,8 @@ from ..db import get_db
 from .. import models
 from ..auth import current_membership
 from ..utils import maturity_level
+from ..services.assessments import completed_rows
+from .diagnostic import personal_scope
 
 router = APIRouter(prefix="/reports", tags=["reports"])
 
@@ -16,18 +18,27 @@ NEXT_STEPS = {
 }
 
 
-@router.get("/me")
-def my_report(m: models.Membership = Depends(current_membership), db: Session = Depends(get_db)):
+def build_report(m, db):
     rows = db.query(models.Response).filter_by(membership_id=m.id).all()
-    scores = [r.score for r in rows if r.score is not None]
+    complete = completed_rows(db, m, rows)
+    assessment = db.get(models.Assessment, m.id)
+    scores = [r.score for r in complete]
     avg = sum(scores) / len(scores) if scores else None
-    flags = sorted({f for r in rows for f in (r.flags or [])})
+    flags = sorted({f for r in complete for f in (r.flags or [])})
     return {
         "name": m.user.name,
         "organization": m.org.name,
         "answered": len(rows),
+        "status": "completed" if complete else ("incomplete" if rows else "empty"),
+        "scoring_mode": assessment.scoring_mode if complete else None,
+        "completed_at": assessment.completed_at.isoformat() if complete else None,
         "average_score": round(avg, 2) if avg is not None else None,
         "level": maturity_level(avg),
         "risks": flags,
-        "next_steps": NEXT_STEPS.get(m.job_role, NEXT_STEPS["manager"]),
+        "next_steps": NEXT_STEPS.get(m.job_role, NEXT_STEPS["manager"]) if complete else [],
     }
+
+
+@router.get("/me", dependencies=[Depends(personal_scope)])
+def my_report(m: models.Membership = Depends(current_membership), db: Session = Depends(get_db)):
+    return build_report(m, db)
