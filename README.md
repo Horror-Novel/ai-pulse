@@ -6,6 +6,27 @@ AI Pulse is a role-adaptive AI usage diagnostic with private employee reports an
 
 React calls the FastAPI JSON API. A `User` has a separate `Membership` in each organization, carrying that organization's permission role, department, job role and seniority. Eligible questions come from the question bank; validated submissions atomically replace the membership's `Response` rows and current `Assessment` completion record. Personal reports and leadership aggregates are computed from validated complete assessments. Open answers use either deterministic mock fixtures or the configured AI provider.
 
+## Assessment completion status
+
+Final functional verification on **29 October 2026**, starting from revision `1a67d78`: **95 backend tests passed, 3 browser workflows passed, and the frontend production build passed**. The status below applies to the tested local mock-mode pilot, not a production certification. [CLIENT_REQUEST.md](CLIENT_REQUEST.md) records the implemented client requirements and their verification evidence.
+
+| Requirement | Current status | Implementation evidence and remaining scope |
+|---|---|---|
+| Enterprise security and multi-tenant isolation | Core controls verified; production hardening partial | `auth.py`, dashboard authorization, `test_security.py` and `test_api.py` verify tenant membership, organization-specific roles and denied access. SSO/MFA, rate limits and operational controls remain unfinished. |
+| Diagnostic correctness | Completed and verified for the pilot | Explicit seniority ranks, eligible complete submissions, atomic replacement and employee-weighted averages; covered by `test_questions.py`, `test_diagnostic.py` and `test_privacy.py`. |
+| Small-group privacy | Completed and verified for threshold suppression | Server-side five-employee rule and exclusion of suppressed scores/risks from aggregates; `test_privacy.py`. Formal anonymity across repeated releases is not established. |
+| Employee data deletion | Completed and verified for the selected organization | Authenticated own-data deletion, rollback, empty reports and immediate recalculation on subsequent dashboard requests; `test_personal_data.py`, `test_diagnostic.py`, `test_privacy.py` and browser workflows. Open screens refresh every five seconds or on focus/manual refresh. |
+| AI scoring reliability | Validation verified; live quality unverified | Strict schemas, explicit provider failures and no fabricated fallback scores; `test_scoring.py` and `test_diagnostic.py`. Live accuracy, fairness and injection resistance remain unverified. |
+| One original feature | Completed and verified | Employee JSON export in `routes/diagnostic.py` and `Report.jsx`; authorization/content tests and a real browser download. |
+| Automated coverage | Completed for the tested workflows | 95 isolated backend tests and 3 browser workflows pass; no claim of exhaustive coverage or load testing. |
+| Frontend production build | Completed and verified | `npm run build` passes with the existing locked dependencies. |
+| Reproducible project setup | Mock setup verified; container execution unverified | Dependency locks, guarded seed fixtures, isolated browser servers and successful clean-install CI. Docker execution remains unverified. |
+| README completeness | Completed and checked | Setup, confirmed findings, fixes, client handling/questions, original feature, AI disclosure/mistake, evidence and limitations are self-contained. |
+| Git history preservation | Verified | The inherited history and prior assessment commits remain ancestors; updates use ordinary commits with no history rewriting or force-push. |
+| AI assistance and genuine mistake | Documented | The AI usage section records Codex's role, the observed shared-salt seed mistake, its correction and the regression test. |
+
+The separate recording and assessment form remain the candidate's responsibility. Production hardening, live-model validation and unresolved client policy decisions are described below.
+
 ## Running locally
 
 Use **Python 3.13** and **Node.js 22.12+** (Node 22 LTS recommended). Vite's [Node requirements](https://vite.dev/guide/) changed with the tooling security upgrade. No paid model or external database is needed.
@@ -94,6 +115,8 @@ The seed has exactly five complete Support employees. Sales, Engineering, HR and
 
 ## Client request
 
+Both requested pilot behaviors are implemented and verified; see [the client implementation status](CLIENT_REQUEST.md#implementation-status) for source files, tests and scope limitations. The original client email is preserved there verbatim.
+
 ### Small-group privacy
 
 Implemented server-side in `backend/app/routes/dashboard.py`. A department needs **five distinct employees with a complete validated diagnostic in that organization and department**. Administrator-only memberships do not contribute.
@@ -151,16 +174,16 @@ npm audit
 
 Browser tests launch real FastAPI and Vite servers on **8001 and 5174**, with a disposable temporary database; they never reset the local demo database. The virtual environment must be named `.venv` in the repository root, or set `PYTHON` to its executable before running Playwright. On a Linux CI host install browser OS packages with `npx playwright install --with-deps chromium`.
 
-Observed on Windows / Python 3.13 / Node 25.2.1:
+Latest local functional checks, rerun on **29 October 2026**, used Windows / Python 3.13 / Node 25.2.1 and the commands above:
 
 - Backend: **95 passed**. One upstream Starlette warning deprecates its current HTTPX test transport; tests still pass.
 - Browser: **3 passed**, including a real JSON download, submit/report, confirmation cancellation, delete/empty export, automatic five-to-four dashboard suppression, retake restoration, organization switching, direct API denial, and a simulated provider-error UI/retry.
 - Frontend: production build passed.
-- Backend and frontend audits: no known vulnerabilities in the final resolved dependency sets at verification time. This is not proof that packages are vulnerability-free.
+- Backend and frontend dependency audits during implementation on **28 October 2026** reported no known vulnerabilities in the resolved dependency sets. Audits were not rerun in the final functional check; this historical result is not proof that packages are vulnerability-free.
 - Provider tests use mocks only: original malformed fixtures, missing fields, types/ranges/flags, timeouts, network/HTTP errors, credentials and prompt message separation.
 - The browser error test injects HTTP 502 to exercise the UI; backend tests independently verify actual scoring failure and rollback.
 - Dockerfile corrected, but image execution unverified: Docker Desktop's Linux daemon is unavailable here.
-- GitHub Actions is configured in `.github/workflows/ci.yml`. The [verified application CI run](https://github.com/Horror-Novel/ai-pulse/actions/runs/40735662385) passed on revision `caed34c`, independently confirming 95 backend tests, the production build and 3 browser workflows on Linux with Python 3.13 and Node 22.
+- GitHub Actions is configured in `.github/workflows/ci.yml`. The [verified pre-finalization CI run](https://github.com/Horror-Novel/ai-pulse/actions/runs/40738319465) passed on revision `1a67d78`, independently confirming the backend suite, production build and browser workflows on Linux with Python 3.13 and Node 22. Each subsequent push triggers a new run; the linked result is evidence for that exact revision.
 
 ### Reproduce the client privacy behavior
 
